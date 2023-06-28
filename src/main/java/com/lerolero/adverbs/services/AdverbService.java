@@ -10,6 +10,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import com.lerolero.adverbs.repositories.MongoAdverbRepository;
+import com.lerolero.adverbs.repositories.AdverbCache;
 import com.lerolero.adverbs.models.Adverb;
 
 @Service
@@ -18,8 +19,17 @@ public class AdverbService {
 	@Autowired
 	private MongoAdverbRepository repo;
 
+	@Autowired
+	private AdverbCache cache;
+
 	private Mono<String> next() {
-		return repo.pullRandom()
+		return cache.next()
+			.flatMap(a -> {
+				if (a.getString() == null) return repo.findById(a.getId());
+				else return Mono.just(a);
+			})
+			.cast(Adverb.class)
+			.doOnNext(a -> cache.add(a))
 			.map(a -> a.getString());
 	}
 
